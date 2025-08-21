@@ -8,9 +8,11 @@ import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 import lombok.AllArgsConstructor;
 import lombok.Data;
+import lombok.NoArgsConstructor;
 
 @Data
 @AllArgsConstructor
+@NoArgsConstructor
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public class DishDTO {
 
@@ -21,8 +23,8 @@ public class DishDTO {
     private String nameDish;
 
     @NotNull
-    @Min(value = 1)
-    @Max(value = 999)
+    @Min(value = 1, message = "El valor minimo de un plato debe ser de 1 USD")
+    @Max(value = 999, message = "El valor maximo de un plato debe ser de 999 USD")
     private Double priceDish;
 
     @NotNull
