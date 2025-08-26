@@ -1,5 +1,9 @@
 package com.reactor.reactor.services;
 
+import org.springframework.data.domain.Pageable;
+
+import com.reactor.reactor.paginations.PageSupport;
+
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
@@ -16,6 +20,6 @@ public interface ICRUD<T, ID> {
 
     Mono<Boolean> delete(ID id);
 
-    // pagination pending
+    Mono<PageSupport<T>> getPage(Pageable pageable);
 
 }

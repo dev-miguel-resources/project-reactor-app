@@ -6,7 +6,7 @@ import org.modelmapper.ModelMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Qualifier;
-
+import org.springframework.data.domain.PageRequest;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.server.reactive.ServerHttpRequest;
@@ -17,12 +17,12 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
-
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.reactor.reactor.dtos.DishDTO;
 import com.reactor.reactor.models.Dish;
-
+import com.reactor.reactor.paginations.PageSupport;
 import com.reactor.reactor.services.IDishService;
 
 import jakarta.validation.Valid;
@@ -115,6 +115,33 @@ public class DishController {
                         return Mono.just(ResponseEntity.notFound().build());
                     }
                 });
+    }
+
+    @GetMapping("/pageable")
+    public Mono<ResponseEntity<PageSupport<DishDTO>>> getPage(
+            @RequestParam(name = "page", defaultValue = "0") int page,
+            @RequestParam(name = "size", defaultValue = "2") int size) {
+
+        // Se llama al servicio para obtener una página de datos usando los valores de
+        // "page" y "size"
+        return service.getPage(PageRequest.of(page, size))
+
+                // Transformar el resultado de PageSupport<T> original a uno con DishDTO, usando
+                // el mapper
+                .map(pageSupport -> new PageSupport<>(
+                        pageSupport.getContent().stream().map(this::convertToDto).toList(),
+
+                        pageSupport.getPageNumber(), // Número de la página actual
+                        pageSupport.getPageSize(), // Tamaño de la página
+                        pageSupport.getTotalElements() // Total de elementos
+                ))
+
+                // Empaquetamos el resultado dentro de un ResponseEntity en formato JSON
+                .map(e -> ResponseEntity.ok()
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .body(e))
+                .defaultIfEmpty(ResponseEntity.notFound().build());
+
     }
 
 }
