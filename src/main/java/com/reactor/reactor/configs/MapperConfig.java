@@ -15,7 +15,7 @@ public class MapperConfig {
     @Bean(name = "clientMapper")
     public ModelMapper clientMapper() {
         return new ModelMapper();
-        // será modificado pronto
+        // próxima clase
     }
 
 }
