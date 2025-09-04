@@ -1,7 +1,11 @@
 package com.reactor.reactor.controllers;
 
+import java.io.File;
 import java.net.URI;
+import java.nio.file.Files;
+import java.util.Map;
 
+import org.cloudinary.json.JSONObject;
 import org.modelmapper.ModelMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -9,6 +13,7 @@ import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.codec.multipart.FilePart;
 import org.springframework.http.server.reactive.ServerHttpRequest;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -18,8 +23,11 @@ import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RequestPart;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.cloudinary.Cloudinary;
+import com.cloudinary.utils.ObjectUtils;
 import com.reactor.reactor.dtos.ClientDTO;
 import com.reactor.reactor.models.Client;
 import com.reactor.reactor.paginations.PageSupport;
@@ -39,7 +47,8 @@ public class ClientController {
 
     private final IClientService service;
 
-    // darle comportamiento a este mapper
+    private final Cloudinary cloudinary;
+
     @Qualifier("clientMapper")
     private final ModelMapper modelMapper;
 
@@ -146,6 +155,87 @@ public class ClientController {
 
     }
 
-    // implementar los métodos nuevos
+    // Versión simple + detallado
+    // MultipartFile: apps no reactivas
+    // FilePart: enfoque reactivo
+    @PostMapping("/v1/upload/{id}")
+    public Mono<ResponseEntity<ClientDTO>> uploadV1(@PathVariable("id") String id,
+            @RequestPart("file") FilePart filePart) {
+
+        // Buscar al cliente por su id
+        return service.findById(id)
+                .flatMap(client -> { // cuando lo encuentra, ejecuta un lambda function
+                    try {
+                        // 1. Crear una referencia temporal con el mismo nombre que el archivo subido
+                        File f = Files.createTempFile("temp", filePart.filename()).toFile();
+
+                        // 2. Transferir el contenido del archivo recibido (FilePart) al recurso
+                        // temporal
+                        filePart.transferTo(f).block();
+
+                        // 3. Subir el archivo a Cloudinary
+                        @SuppressWarnings("unchecked")
+                        Map<String, Object> response = cloudinary.uploader().upload(f,
+                                ObjectUtils.asMap("resource_type", "auto"));
+
+                        // 4. Extraer la URL de la imagen subida a cloudinary desde la respuesta del
+                        // JSON
+                        JSONObject json = new JSONObject(response);
+                        String url = json.getString("url");
+
+                        // 5. Actualizar el cliente con la nueva URL de la foto
+                        client.setUrlPhoto(url);
+
+                        // 6. Guardar los cambios en la bdd, convertir a DTO y retornan el
+                        // ResponseEntity
+                        return service.update(id, client)
+                                .map(this::convertToDto)
+                                .map(e -> ResponseEntity.ok().body(e));
+
+                    } catch (Exception e) {
+                        return Mono.just(ResponseEntity.badRequest().build());
+                    }
+                });
+
+    }
+
+    // Versión: más técnica, moderno y de mayor performance
+    @PostMapping("/v2/upload/{id}")
+    public Mono<ResponseEntity<ClientDTO>> uploadV2(@PathVariable("id") String id,
+            @RequestPart("file") FilePart filePart) {
+
+        return Mono.fromCallable(() -> {
+            // 1. Crear una referencia temporal con el mismo nombre que el archivo subido
+            return Files.createTempFile("temp", filePart.filename()).toFile();
+        })
+                .flatMap(tempFile ->
+                // 2. Transferir el contenido del archivo recibido (FilePart) al recurso
+                // temporal
+                filePart.transferTo(tempFile)
+                        .then(service.findById(id) // 3. Buscar al cliente
+                                .flatMap(client -> {
+                                    // Crear nuevamente un mono a partir e una función
+                                    return Mono.fromCallable(() -> {
+                                        // 4. Subir el archivo a Cloudinary
+                                        @SuppressWarnings("unchecked")
+                                        Map<String, Object> response = cloudinary.uploader().upload(tempFile,
+                                                ObjectUtils.asMap("resource_type", "auto"));
+
+                                        // 5. Obtener la URL de la imagen subida
+                                        JSONObject json = new JSONObject(response);
+                                        String url = json.getString("url");
+
+                                        // 6. Actualizar el cliente con la photo url
+                                        client.setUrlPhoto(url);
+
+                                        // 7. Guardar los cambios en la bdd, convertir a DTO y retornan el
+                                        // ResponseEntity
+                                        return service.update(id, client)
+                                                .map(this::convertToDto)
+                                                .map(e -> ResponseEntity.ok().body(e));
+                                        // Hasta aquí tenemos: Mono<Mono<ResponseEntity<ClientDTO>>>
+                                    }).flatMap(mono -> mono);
+                                })));
+    }
 
 }
