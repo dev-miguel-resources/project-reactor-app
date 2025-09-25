@@ -91,32 +91,25 @@ public class InvoiceServiceImpl extends CRUDImpl<Invoice, String> implements IIn
         }
     }
 
-    @Override
-    public Mono<byte[]> generateReport(String invoice) {
-        // TODO Auto-generated method stub
-        throw new UnsupportedOperationException("Unimplemented method 'generateReport'");
-    }
-
     // Generar un PDF a partir del Invoice generado.
-    /*
-     * @Override
-     * public Mono<byte[]> generateReport(String idInvoice) {
-     * long startTime = System.currentTimeMillis(); // Marca inicial de ejecución
-     * 
-     * return invoiceRepo.findById(idInvoice) // Buscamos el invoice por ID
-     * .subscribeOn(Schedulers.single()) // Ejecuta en un hilo único (single thread)
-     * .publishOn(Schedulers.newSingle("th-data")) // Genera un nuevo hilo llamado
-     * "th-data"
-     * .flatMap(invoice -> Mono.zip( // operador reactivo para ejecutar 2
-     * procesamientos en paralelo
-     * populateClient(invoice), // Me devuelve el client poblado
-     * populateItems(invoice), // Poblamos los items
-     * (populateClient, populatedItems) -> detailsComplete // Combinación de
-     * resultados
-     * ))
-     * .publishOn(Schedulers.boundedElastic()) // Cambia a un pool elástico
-     * .map(this::generatePDF) // Genera el PDF con el invoice final
-     * }
-     */
+    @Override
+    public Mono<byte[]> generateReport(String idInvoice) {
+        long startTime = System.currentTimeMillis(); // Marca inicial de ejecución
+
+        return invoiceRepo.findById(idInvoice) // Buscamos el invoice por ID
+                .subscribeOn(Schedulers.single()) // Ejecuta en un hilo único (single thread)
+                .publishOn(Schedulers.newSingle("th-data")) // Genera un nuevo hilo llamado
+                .flatMap(invoice -> Mono.zip( // operador reactivo para ejecutar 2
+                        populateClient(invoice), // Me devuelve el client poblado
+                        populateItems(invoice), // Poblamos los items
+                        (populateClient, populatedItems) -> populatedItems)) // Combinación de resultados
+                .publishOn(Schedulers.boundedElastic()) // Cambia a un pool elástico
+                .map(this::generatePDF) // Genera el PDF con el invoice final
+                .onErrorResume(e -> Mono.empty()) // Si ocurre un error, devolvemos el Mono vacío
+                .doOnSuccess(inv -> { // cuando el proceso termine correctamente
+                    long endTime = System.currentTimeMillis();
+                    System.out.println("Total time: " + (endTime - startTime) + "ms");
+                });
+    }
 
 }

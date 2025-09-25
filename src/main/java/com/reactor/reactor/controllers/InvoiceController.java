@@ -160,4 +160,13 @@ public class InvoiceController {
                 .zipWith(monoLink, EntityModel::of); // Combinó el DTO + el link de hateoas
     }
 
+    @GetMapping("/generateReport/{id}")
+    public Mono<ResponseEntity<byte[]>> generateReport(@PathVariable("id") String id) {
+        return service.generateReport(id)
+                .map(bytes -> ResponseEntity.ok()
+                        .contentType(MediaType.APPLICATION_PDF)
+                        .body(bytes))
+                .defaultIfEmpty(ResponseEntity.notFound().build());
+    }
+
 }
