@@ -1,21 +1,19 @@
 package com.reactor.reactor.security;
 
-import java.util.List;
-
+import io.jsonwebtoken.Claims;
+import lombok.RequiredArgsConstructor;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.ReactiveAuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
-
-import io.jsonwebtoken.Claims;
-import lombok.RequiredArgsConstructor;
+import org.springframework.stereotype.Component;
 import reactor.core.publisher.Mono;
 
-/*
- * Esta clase se encarga de envolver la autenticación de usuarios bajo un marco reactivo.
- */
-// Clase 5
+import java.util.List;
+
+//Clase 5
+@Component
 @RequiredArgsConstructor
 public class AuthenticationManager implements ReactiveAuthenticationManager {
 
@@ -34,10 +32,8 @@ public class AuthenticationManager implements ReactiveAuthenticationManager {
                     roles.stream().map(SimpleGrantedAuthority::new).toList());
 
             return Mono.just(auth);
-
         } else {
             return Mono.error(new BadCredentialsException("Invalid token"));
         }
     }
-
 }
